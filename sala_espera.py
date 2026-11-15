@@ -34,7 +34,11 @@ def atender_siguiente(r: redis.Redis, evento_id, timeout: int = 0):
     Con `timeout=0` espera indefinidamente. Obtener y eliminar deben ser una
     sola operación, o dos operadores podrían atender al mismo usuario.
     """
-    
+    res = r.bzpopmax(clave(evento_id), timeout=timeout)
+    if res is None:
+        return None # timeout agotado, cola vacía
+    _, usuario_id, prioridad = res
+    return usuario_id, float(prioridad)
 
 
 def en_espera(r: redis.Redis, evento_id) -> int:
@@ -47,5 +51,5 @@ def posicion(r: redis.Redis, evento_id, usuario_id) -> int | None:
 
     El puesto 1 es el que se va a atender antes.
     """
-    # TODO
-    raise NotImplementedError
+    rank = r.zrevrank(clave(evento_id), str(usuario_id))
+    return None if rank is None else rank + 1 
