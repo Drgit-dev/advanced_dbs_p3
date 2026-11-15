@@ -33,7 +33,29 @@ def propietario(r: redis.Redis, evento_id, asiento) -> str | None:
 
 def segundos_restantes(r: redis.Redis, evento_id, asiento) -> int:
     """Segundos que quedan. -1 si la reserva es firme, -2 si no hay reserva."""
-    return r.get(clave(evento_id, asiento))
+    return r.ttl(clave(evento_id, asiento))
+
+
+# Comprobar de quién es la reserva y actuar sobre ella tiene que ser una sola
+# operación: si se hace en dos comandos, la reserva puede caducar entremedias
+# y acabar borrando o confirmando la de otro usuario. Los scripts de Lua se
+# ejecutan de forma atómica en el servidor.
+_SCRIPT_LIBERAR = """
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("del", KEYS[1])
+else
+    return 0
+end
+"""
+
+_SCRIPT_CONFIRMAR = """
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    redis.call("persist", KEYS[1])
+    return 1
+else
+    return 0
+end
+"""
 
 
 def liberar(r: redis.Redis, evento_id, asiento, usuario_id) -> bool:
@@ -44,8 +66,8 @@ def liberar(r: redis.Redis, evento_id, asiento, usuario_id) -> bool:
     **no es correcto**: entre uno y otro la reserva puede caducar y pasar a
     otro usuario, y se le borraría la suya.
     """
-    # TODO
-    raise NotImplementedError
+    return bool(r.eval(_SCRIPT_LIBERAR, 1, clave(evento_id, asiento),
+                       str(usuario_id)))
 
 
 def confirmar(r: redis.Redis, evento_id, asiento, usuario_id) -> bool:
@@ -53,5 +75,5 @@ def confirmar(r: redis.Redis, evento_id, asiento, usuario_id) -> bool:
 
     Solo puede hacerlo el propietario. Devuelve si se ha confirmado.
     """
-    # TODO
-    raise NotImplementedError
+    return bool(r.eval(_SCRIPT_CONFIRMAR, 1, clave(evento_id, asiento),
+                       str(usuario_id)))

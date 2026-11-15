@@ -10,6 +10,9 @@ from random import randint
 import yaml
 import time
 
+import redis
+from cache import CacheDocumentos
+
 import pymongo
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
@@ -37,7 +40,10 @@ class Model:
     _location_var: str | None = None
     _modified_vars: set[str] = set()
     _db: Collection
-    _internal_vars: set[str] = frozenset(('_modified_vars', '_required_vars', '_admissible_vars', '_db', '_data', '_location_var'))
+    # Caché de documentos compartida por todos los modelos. None si initApp
+    # no recibió redis_uri: el ODM sigue funcionando sin cachear.
+    _cache: CacheDocumentos | None = None
+    _internal_vars: set[str] = frozenset(('_modified_vars', '_required_vars', '_admissible_vars', '_db', '_data', '_location_var', '_cache'))
 
     def __init__(self, **kwargs: dict[str, str | dict | list]) -> None:
         # rechazar no permitidos
@@ -81,11 +87,22 @@ class Model:
         if '_id' in self._data:
             update_fields = {k: self._data[k] for k in self._modified_vars}
             self._db.update_one({'_id': self._data['_id']}, {'$set': update_fields})
-        else: self._db.insert_one(self._data)
+            # Al actualizar se invalida, no se sobrescribe: el documento en
+            # MongoDB puede tener campos que este objeto no conoce.
+            if Model._cache is not None:
+                Model._cache.invalidar(self._db.name, self._data['_id'])
+        else:
+            self._db.insert_one(self._data)
+            # Al insertar, self._data (con el _id ya asignado) es exactamente
+            # lo que queda en MongoDB: se cachea tal cual.
+            if Model._cache is not None:
+                Model._cache.set(self._db.name, self._data['_id'], dict(self._data))
         self._modified_vars.clear()
 
     def delete(self) -> None:
         self._db.delete_one({'_id': self._data['_id']})
+        if Model._cache is not None:
+            Model._cache.invalidar(self._db.name, self._data['_id'])
     
     @classmethod
     def find(cls, filter: dict[str, str | dict]) -> Any:
@@ -111,8 +128,18 @@ class Model:
             Self | None
                 Modelo del documento encontrado o None si no se encuentra
         """ 
-        #TODO
-        pass
+        # Si hay caché se consulta primero; si está, no se toca MongoDB.
+        if Model._cache is not None:
+            documento = Model._cache.get(cls._db.name, id)
+            if documento is not None:
+                return cls(**documento)
+
+        documento = cls._db.find_one({'_id': id})
+        if documento is None: return None
+
+        if Model._cache is not None:
+            Model._cache.set(cls._db.name, id, documento)
+        return cls(**documento)
 
     @classmethod
     def init_class(cls, db_collection: Collection, indexes: dict[str,str], required_vars: set[str], admissible_vars: set[str], location_var: str | None) -> None:
@@ -139,9 +166,17 @@ class ModelCursor:
             yield self.model(**doc)
 
 
-def initApp(definitions_path: str = "./models.yml", mongodb_uri="mongodb://localhost:27017/", db_name="abd", scope=globals()) -> None:
+def initApp(definitions_path: str = "./models.yml", mongodb_uri="mongodb://localhost:27017/", db_name="abd", scope=globals(), redis_uri: str | None = None) -> None:
     client = MongoClient(mongodb_uri, server_api=ServerApi('1'))
     db = client[db_name]
+
+    # Caché de documentos en Redis, común a todos los modelos. Con
+    # redis_uri=None el ODM funciona sin caché (prácticas 1 y 2).
+    Model._cache = None
+    if redis_uri is not None:
+        cliente_redis = redis.Redis.from_url(redis_uri, decode_responses=True)
+        Model._cache = CacheDocumentos(cliente_redis)
+        Model._cache.configurar_limite()
 
     with open(definitions_path, 'r') as f:
         data_dict = yaml.safe_load(f.read())
