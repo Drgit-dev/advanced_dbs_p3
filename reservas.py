@@ -33,7 +33,11 @@ def propietario(r: redis.Redis, evento_id, asiento) -> str | None:
 
 def segundos_restantes(r: redis.Redis, evento_id, asiento) -> int:
     """Segundos que quedan. -1 si la reserva es firme, -2 si no hay reserva."""
-    return r.get(clave(evento_id, asiento))
+    resultado = r.ttl(clave(evento_id, asiento))
+    if resultado is None:
+        return -2
+
+    return int(resultado)
 
 
 def liberar(r: redis.Redis, evento_id, asiento, usuario_id) -> bool:
