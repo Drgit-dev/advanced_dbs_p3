@@ -24,8 +24,7 @@ def entrar(r: redis.Redis, evento_id, usuario_id, prioridad: float) -> bool:
     Devuelve True si es nuevo en la cola y False si ya estaba (en ese caso se
     le actualiza la prioridad). Un usuario **no puede ocupar dos puestos**.
     """
-    # TODO
-    raise NotImplementedError
+    return bool(r.zadd(clave(evento_id), {str(usuario_id): float(prioridad)}))
 
 
 def atender_siguiente(r: redis.Redis, evento_id, timeout: int = 0):
@@ -35,14 +34,12 @@ def atender_siguiente(r: redis.Redis, evento_id, timeout: int = 0):
     Con `timeout=0` espera indefinidamente. Obtener y eliminar deben ser una
     sola operación, o dos operadores podrían atender al mismo usuario.
     """
-    # TODO
-    raise NotImplementedError
+    
 
 
 def en_espera(r: redis.Redis, evento_id) -> int:
     """Cuántos usuarios hay en la sala."""
-    # TODO
-    raise NotImplementedError
+    return r.zcard(clave(evento_id))
 
 
 def posicion(r: redis.Redis, evento_id, usuario_id) -> int | None:
