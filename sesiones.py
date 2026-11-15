@@ -28,8 +28,11 @@ def clave_sesion(token: str) -> str:
 def crear_usuario(r: redis.Redis, usuario: str, nombre: str,
                   password: str, privilegios: int) -> bool:
     """Crea el usuario si no existe. Devuelve si se ha creado."""
-    # TODO
-    raise NotImplementedError
+    return bool(r.hset(clave_usuario(usuario), mapping={
+        "nombre": nombre,
+        "password": password,
+        "privilegios": str(privilegios),
+    }, nx=True))
 
 
 def obtener_usuario(r: redis.Redis, usuario: str) -> dict | None:
@@ -37,8 +40,8 @@ def obtener_usuario(r: redis.Redis, usuario: str) -> dict | None:
 
     `privilegios` debe venir como **entero**, no como cadena.
     """
-    # TODO
-    raise NotImplementedError
+    datos = r.hgetall(clave_usuario(usuario))
+    return datos if datos else None
 
 
 def actualizar_usuario(r: redis.Redis, usuario: str, **campos) -> bool:
