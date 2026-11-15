@@ -97,17 +97,28 @@ def login_por_token(r: redis.Redis, token: str) -> int:
 
     Un token cuya sesión ha caducado devuelve -1, igual que uno inventado.
     """
-    # TODO
-    raise NotImplementedError
+    if not token:
+        return -1
+    usuario = r.get(clave_sesion(token))
+    if usuario is None:
+        return -1
+    privilegios = r.hget(clave_usuario(usuario), "privilegios")
+    return int(privilegios) if privilegios else -1
 
 
 def logout(r: redis.Redis, token: str) -> bool:
     """Cierra la sesión. Devuelve si había una sesión que cerrar."""
-    # TODO
-    raise NotImplementedError
+    if not token:
+        return False
+    usuario = r.get(clave_sesion(token))
+    borrado = r.delete(clave_sesion(token))
+    if usuario:
+        r.hdel(clave_usuario(usuario), "token")
+    return bool(borrado)
 
 
 def segundos_de_sesion(r: redis.Redis, token: str) -> int:
     """Segundos que le quedan a la sesión. -2 si no existe."""
-    # TODO
-    raise NotImplementedError
+    if not token:
+        return -2
+    return r.ttl(clave_sesion(token))
