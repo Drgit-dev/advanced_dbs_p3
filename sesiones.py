@@ -49,8 +49,13 @@ def actualizar_usuario(r: redis.Redis, usuario: str, **campos) -> bool:
 
     Devuelve False si el usuario no existe.
     """
-    # TODO
-    raise NotImplementedError
+    k = clave_usuario(usuario)
+    if not r.exists(k):
+        return False
+    if campos:
+        r.hset(k, mapping={f: str(v) for f, v in campos.items()})
+    return True
+
 
 
 def borrar_usuario(r: redis.Redis, usuario: str) -> bool:
