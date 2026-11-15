@@ -10,13 +10,12 @@ Las firmas y los valores de retorno **no deben cambiarse**.
 import redis
 
 # TODO: mayor que cualquier prioridad presente o futura.
-PRIORIDAD_ABSOLUTA = None
+PRIORIDAD_ABSOLUTA = float('inf')
 
 
 def clave(evento_id) -> str:
     """Clave de Redis. Formato: envivo:sala:<evento>"""
-    # TODO
-    raise NotImplementedError
+    return f"envivo:sala:{evento_id}"
 
 
 def entrar(r: redis.Redis, evento_id, usuario_id, prioridad: float) -> bool:
