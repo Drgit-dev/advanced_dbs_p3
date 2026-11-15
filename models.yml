@@ -1,0 +1,75 @@
+# Definición de los modelos del ODM.
+#
+# Por cada modelo se declara:
+#   required_vars    atributos que TIENEN que estar en cada documento
+#   admissible_vars  atributos válidos que no tienen por qué estar
+#   unique_indexes   índices con restricción de unicidad
+#   regular_indexes  índices ascendentes normales
+#   location_index   campo de dirección del que se derivará el punto GeoJSON
+#
+# Ojo con location_index: se declara el campo BASE de la dirección. El punto
+# GeoJSON se guardará en <campo>_loc, y es sobre ese campo sobre el que hay
+# que crear el índice 2dsphere.
+#
+# Este fichero es un EJEMPLO con un solo modelo. Hay que sustituirlo por los
+# cuatro modelos de EnVivo: recinto, artista, evento y asistente.
+
+recinto:
+  required_vars:
+    - nombre
+    - direccion
+    - aforo
+  admissible_vars:
+    - ciudad
+    - zonas
+    - servicios
+    - direccion_loc
+  unique_indexes:
+    - nombre
+  regular_indexes:
+    - aforo
+  location_index: direccion
+
+artista:
+  required_vars:
+    - nombre
+    - pais
+    - generos
+  admissible_vars:
+    - ano_inicio
+  unique_indexes:
+    - nombre
+  regular_indexes:
+    - generos
+    - pais
+  location_index: null
+
+evento:
+  required_vars:
+    - titulo
+    - artistas
+    - recinto
+    - fecha
+    - precios_por_zona
+    - entradas_vendidas
+  admissible_vars: # admissible_vars: []
+    - estado
+  unique_indexes:
+    - titulo
+  regular_indexes:
+    - fecha
+    - artistas
+  location_index: null
+
+asistente:
+  required_vars:
+    - nombre
+    - email
+    - fecha_alta
+    - direccion
+  admissible_vars:
+    - preferencias
+    - direccion_loc
+  unique_indexes:
+    - email
+  location_index: direccion
