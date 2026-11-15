@@ -44,8 +44,26 @@ def liberar(r: redis.Redis, evento_id, asiento, usuario_id) -> bool:
     **no es correcto**: entre uno y otro la reserva puede caducar y pasar a
     otro usuario, y se le borraría la suya.
     """
-    # TODO
-    raise NotImplementedError
+    script = """
+    local propietario = redis.call('GET', KEYS[1])
+
+    if propietario == ARGV[1] then
+        return redis.call('DEL', KEYS[1])
+    end
+
+    return 0
+    """
+    # script de lua que comprueba que el propietario 
+    # coincide con el usuario que quiere liberar la reserva
+    # y elimina la clave de redis
+    resultado = r.eval(
+        script,
+        1,
+        clave(evento_id, asiento),
+        str(usuario_id)
+    )
+
+    return bool(resultado)
 
 
 def confirmar(r: redis.Redis, evento_id, asiento, usuario_id) -> bool:
@@ -53,5 +71,22 @@ def confirmar(r: redis.Redis, evento_id, asiento, usuario_id) -> bool:
 
     Solo puede hacerlo el propietario. Devuelve si se ha confirmado.
     """
-    # TODO
-    raise NotImplementedError
+    script = """
+    local propietario = redis.call('GET', KEYS[1])
+
+    if propietario == ARGV[1] then
+        redis.call('PERSIST', KEYS[1])
+        return 1
+    end
+
+    return 0
+    """
+    # PERSIST elimina el tiempo de expiración de de una clave Redis
+    resultado = r.eval(
+        script,
+        1,
+        clave(evento_id, asiento),
+        str(usuario_id)
+    )
+
+    return bool(resultado)
