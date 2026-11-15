@@ -29,11 +29,16 @@ def clave_sesion(token: str) -> str:
 def crear_usuario(r: redis.Redis, usuario: str, nombre: str,
                   password: str, privilegios: int) -> bool:
     """Crea el usuario si no existe. Devuelve si se ha creado."""
-    return bool(r.hset(clave_usuario(usuario), mapping={
+    # me daba un problema al usar nx como argumento 
+    k = clave_usuario(usuario)
+    if r.exists(k):
+        return False
+    r.hset(k, mapping={
         "nombre": nombre,
         "password": password,
         "privilegios": str(privilegios),
-    }, nx=True))
+    })
+    return True
 
 
 def obtener_usuario(r: redis.Redis, usuario: str) -> dict | None:
@@ -42,7 +47,11 @@ def obtener_usuario(r: redis.Redis, usuario: str) -> dict | None:
     `privilegios` debe venir como **entero**, no como cadena.
     """
     datos = r.hgetall(clave_usuario(usuario))
-    return datos if datos else None
+    if not datos:
+        return None
+    if "privilegios" in datos:
+        datos["privilegios"] = int(datos["privilegios"])
+    return datos
 
 
 def actualizar_usuario(r: redis.Redis, usuario: str, **campos) -> bool:
