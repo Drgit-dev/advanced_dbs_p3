@@ -36,10 +36,6 @@ def segundos_restantes(r: redis.Redis, evento_id, asiento) -> int:
     return r.ttl(clave(evento_id, asiento))
 
 
-# Comprobar de quién es la reserva y actuar sobre ella tiene que ser una sola
-# operación: si se hace en dos comandos, la reserva puede caducar entremedias
-# y acabar borrando o confirmando la de otro usuario. Los scripts de Lua se
-# ejecutan de forma atómica en el servidor.
 _SCRIPT_LIBERAR = """
 if redis.call("get", KEYS[1]) == ARGV[1] then
     return redis.call("del", KEYS[1])

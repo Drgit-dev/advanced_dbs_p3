@@ -11,8 +11,6 @@ import redis
 
 TTL_POR_DEFECTO = 24 * 60 * 60      # 24 horas
 MEMORIA_MAXIMA = "150mb"
-# El enunciado pide desalojar las entradas con menor tiempo de vida restante:
-# volatile-ttl lo hace entre las claves con caducidad, que son las de la caché.
 POLITICA_DESALOJO = "volatile-ttl"
 
 
@@ -34,9 +32,6 @@ class CacheDocumentos:
         """Clave de Redis para un documento. Formato: envivo:cache:<col>:<id>"""
         return f"envivo:cache:{coleccion}:{id_documento}"
 
-    # El documento se serializa con pickle y se guarda codificado en base64:
-    # así fechas y ObjectId vuelven con su tipo exacto y el valor sigue siendo
-    # una cadena de texto, compatible con clientes con decode_responses=True.
     @staticmethod
     def _serializa(documento: dict) -> str:
         return base64.b64encode(pickle.dumps(documento)).decode("ascii")
@@ -50,7 +45,6 @@ class CacheDocumentos:
 
         Cada acceso debe **renovar la caducidad** a `self.ttl`.
         """
-        # GETEX lee y renueva la caducidad en una única operación atómica.
         valor = self._r.getex(self.clave(coleccion, id_documento), ex=self.ttl)
         if valor is None:
             return None

@@ -40,8 +40,6 @@ class Model:
     _location_var: str | None = None
     _modified_vars: set[str] = set()
     _db: Collection
-    # Caché de documentos compartida por todos los modelos. None si initApp
-    # no recibió redis_uri: el ODM sigue funcionando sin cachear.
     _cache: CacheDocumentos | None = None
     _internal_vars: set[str] = frozenset(('_modified_vars', '_required_vars', '_admissible_vars', '_db', '_data', '_location_var', '_cache'))
 
@@ -87,14 +85,10 @@ class Model:
         if '_id' in self._data:
             update_fields = {k: self._data[k] for k in self._modified_vars}
             self._db.update_one({'_id': self._data['_id']}, {'$set': update_fields})
-            # Al actualizar se invalida, no se sobrescribe: el documento en
-            # MongoDB puede tener campos que este objeto no conoce.
             if Model._cache is not None:
                 Model._cache.invalidar(self._db.name, self._data['_id'])
         else:
             self._db.insert_one(self._data)
-            # Al insertar, self._data (con el _id ya asignado) es exactamente
-            # lo que queda en MongoDB: se cachea tal cual.
             if Model._cache is not None:
                 Model._cache.set(self._db.name, self._data['_id'], dict(self._data))
         self._modified_vars.clear()
@@ -128,7 +122,6 @@ class Model:
             Self | None
                 Modelo del documento encontrado o None si no se encuentra
         """ 
-        # Si hay caché se consulta primero; si está, no se toca MongoDB.
         if Model._cache is not None:
             documento = Model._cache.get(cls._db.name, id)
             if documento is not None:
@@ -170,8 +163,6 @@ def initApp(definitions_path: str = "./models.yml", mongodb_uri="mongodb://local
     client = MongoClient(mongodb_uri, server_api=ServerApi('1'))
     db = client[db_name]
 
-    # Caché de documentos en Redis, común a todos los modelos. Con
-    # redis_uri=None el ODM funciona sin caché (prácticas 1 y 2).
     Model._cache = None
     if redis_uri is not None:
         cliente_redis = redis.Redis.from_url(redis_uri, decode_responses=True)
